@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GENIM // Cyberpunk Image Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@300;500&display=swap');
+        
+        body {
+            background-color: #050505;
+            color: #00ffcc;
+            font-family: 'JetBrains+Mono', monospace;
+            background-image: 
+                radial-gradient(circle at 50% 50%, #1a1a2e 0%, #050505 100%);
+        }
+
+        h1, h2, .cyber-font {
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .cyber-border {
+            border: 1px solid #00ffcc;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+        }
+
+        .cyber-input {
+            background: rgba(0, 255, 204, 0.05);
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+        }
+
+        .cyber-button {
+            background: #00ffcc;
+            color: #050505;
+            transition: all 0.3s ease;
+        }
+
+        .cyber-button:hover {
+            background: #ff00ff;
+            box-shadow: 0 0 20px #ff00ff;
+            color: white;
+        }
+
+        .glitch {
+            text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff;
+        }
+
+        #image-container img {
+            max-width: 100%;
+            border: 1px solid #ff00ff;
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+        }
+
+        .loading-bar {
+            height: 2px;
+            background: #ff00ff;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-12 text-center">
+            <h1 class="text-5xl font-bold glitch mb-2">GENIM</h1>
+            <p class="text-sm opacity-70">// NEURAL IMAGE SYNTHESIS ENGINE v0.1</p>
+        </header>
+
+        <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Control Panel -->
+            <section class="cyber-border p-6 bg-black/50 backdrop-blur-sm">
+                <h2 class="text-xl mb-6 border-b border-[#00ffcc]/30 pb-2">Input Parameters</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-xs mb-2 opacity-70">PROMPT_STRING</label>
+                        <textarea id="prompt" rows="4" 
+                            class="w-full cyber-input p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#ff00ff]"
+                            placeholder="Enter neural prompt..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs mb-2 opacity-70">MODEL_ID</label>
+                        <select id="modelId" class="w-full cyber-input p-2 text-sm focus:outline-none">
+                            <option value="gemini-3.1-flash-image">Gemini 3.1 Flash Image (Nano Banana 2)</option>
+                            <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image (Nano Banana)</option>
+                        </select>
+                    </div>
+
+                    <button id="generateBtn" class="w-full cyber-button py-3 font-bold cyber-font">
+                        EXECUTE_SYNTHESIS
+                    </button>
+
+                    <div id="status" class="text-xs text-center opacity-50 italic">
+                        SYSTEM_READY
+                    </div>
+                </div>
+            </section>
+
+            <!-- Output Display -->
+            <section class="cyber-border p-6 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center min-h-[300px]">
+                <h2 class="text-xl mb-6 border-b border-[#00ffcc]/30 pb-2 w-full">Visual_Output</h2>
+                
+                <div id="image-container" class="w-full flex items-center justify-center">
+                    <p id="placeholder" class="text-xs opacity-30 italic text-center">NO_DATA_IN_BUFFER</p>
+                </div>
+
+                <div id="loading-wrapper" class="w-full mt-4 hidden">
+                    <div class="loading-bar" id="loading-bar"></div>
+                </div>
+
+                <a id="downloadBtn" class="hidden mt-4 text-xs cyber-button px-4 py-1 rounded cursor-pointer">
+                    DOWNLOAD_ASSET
+                </a>
+            </section>
+        </main>
+
+        <footer class="mt-12 text-[10px] opacity-30 text-center">
+            <p>CORE_OS: FACTORIUM // AGENT: UNA // PROTOCOL: GENIM_V1</p>
+        </footer>
+    </div>
+
+    <script>
+        const promptEl = document.getElementById('prompt');
+        const modelEl = document.getElementById('modelId');
+        const btnEl = document.getElementById('generateBtn');
+        const statusEl = document.getElementById('status');
+        const containerEl = document.getElementById('image-container');
+        const placeholderEl = document.getElementById('placeholder');
+        const loadingWrapper = document.getElementById('loading-wrapper');
+        const loadingBar = document.getElementById('loading-bar');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        btnEl.addEventListener('click', async () => {
+            const prompt = promptEl.value.trim();
+            const modelId = modelEl.value;
+
+            if (!prompt) {
+                statusEl.innerText = 'ERROR: EMPTY_PROMPT';
+                return;
+            }
+
+            // UI Reset
+            statusEl.innerText = 'SYNTHESIZING...';
+            btnEl.disabled = true;
+            btnEl.style.opacity = '0.5';
+            placeholderEl.classList.add('hidden');
+            containerEl.innerHTML = '';
+            loadingWrapper.classList.remove('hidden');
+            loadingBar.style.width = '30%';
+            downloadBtn.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, modelId })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'SYNTHESIS_FAILED');
+                }
+
+                loadingBar.style.width = '70%';
+                const blob = await response.blob();
+                const imgUrl = URL.createObjectURL(blob);
+
+                const img = document.createElement('img');
+                img.src = imgUrl;
+                img.className = 'animate-pulse'; // Temporary pulse effect
+                containerEl.appendChild(img);
+
+                // Remove pulse after load
+                img.onload = () => {
+                    img.classList.remove('animate-pulse');
+                    loadingBar.style.width = '100%';
+                    statusEl.innerText = 'SYNTHESIS_COMPLETE';
+                    downloadBtn.classList.remove('hidden');
+                    downloadBtn.onclick = () => {
+                        const a = document.createElement('a');
+                        a.href = imgUrl;
+                        a.download = `genim_${Date.now()}.png`;
+                        a.click();
+                    };
+                    setTimeout(() => {
+                        loadingWrapper.classList.add('hidden');
+                        loadingBar.style.width = '0%';
+                    }, 500);
+                };
+
+            } catch (err) {
+                console.error(err);
+                statusEl.innerText = `ERROR: ${err.message}`;
+                placeholderEl.classList.remove('hidden');
+                placeholderEl.innerText = err.message;
+                loadingWrapper.classList.add('hidden');
+            } finally {
+                btnEl.disabled = false;
+                btnEl.style.opacity = '1';
+            }
+        });
+    </script>
+</body>
+</html>
